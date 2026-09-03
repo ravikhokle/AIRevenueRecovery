@@ -13,7 +13,7 @@ Instead of blindly retrying every payment, Recovery AI combines **AI diagnosis w
 * 🛑 **Stop recovery** — for fraud, hard declines, or exhausted retries
 
 **Track:** 03 — AI Revenue Recovery (Razorpay AI Buildathon)
-**Repository:** [GitHub Repository](https://github.com/ravikhokle/AIRevenueRecovery?utm_source=chatgpt.com)
+**Repository:** [GitHub Repository](https://github.com/ravikhokle/AIRevenueRecovery)
 
 ---
 
