@@ -2,551 +2,199 @@
 
 > **AI-powered payment recovery that helps businesses recover lost revenue — safely.**
 
-Recovery AI is an intelligent payment-recovery agent that identifies failed or abandoned payments, understands **why the payment failed**, and chooses the safest recovery action.
+Recovery AI is an intelligent payment-recovery agent that identifies failed or abandoned payments, diagnoses **why the payment failed**, and executes the safest recovery action.
 
-Instead of blindly retrying payments, Recovery AI combines **AI decision-making with deterministic safety rules** to decide whether to:
+Instead of blindly retrying payments, Recovery AI pairs **AI decision-making with deterministic safety rules** to decide whether to:
 
-* 🔄 Retry the payment
-* 💳 Suggest an alternate payment method
-* 🔔 Send a payment reminder
-* 🧑‍💼 Send the case for human review
-* 🛑 Stop recovery when the payment should not be retried
+* 🔄 **Retry the payment** (for transient bank/network drops)
+* 💳 **Suggest alternate payment method** (for soft declines/insufficient funds)
+* 🔔 **Send payment reminder** (for abandoned checkouts)
+* 🧑‍💼 **Escalate to human review** (for high-value or ambiguous transactions)
+* 🛑 **Stop recovery** (for fraud, hard declines, or max retries reached)
 
-**Built for Track 03 — AI Revenue Recovery**
-
+**Track:** 03 — AI Revenue Recovery (Razorpay AI Buildathon)  
 **Repository:** https://github.com/ravikhokle/AIRevenueRecovery
 
 ---
 
 ## 💡 The Problem
 
-Payment failures don't always mean lost customers.
+Payment failures don't always mean lost customers. A payment can fail due to:
 
-A payment can fail because of:
+* Temporary network/gateway timeouts
+* Soft declines (insufficient funds)
+* Expired or stolen cards (hard declines)
+* Checkout drop-offs / abandonments
+* Retry limit exhaustion
 
-* Temporary network problems
-* Insufficient funds
-* Expired cards
-* Fraud or hard declines
-* Checkout abandonment
-* Too many previous retry attempts
+Naive recovery systems blindly retry every failure, leading to:
+* ❌ Duplicate charges & customer friction
+* ❌ Gateway penalties on hard declines
+* ❌ Silent, unrecoverable revenue loss
 
-A simple retry system treats all failures the same.
-
-That can lead to:
-
-* ❌ Unnecessary retries
-* ❌ Duplicate charges
-* ❌ Poor customer experience
-* ❌ Increased payment failures
-* ❌ Revenue being permanently lost
-
-Businesses need a smarter way to decide **which payments can be recovered and how**.
+Businesses need a closed-loop system: **detect → diagnose → enforce safety → recover → audit**.
 
 ---
 
-## 🚀 Our Solution
+## 🚀 The Solution: Two-Tier Architecture
 
-**Recovery AI acts as a decision-making layer between failed payments and recovery actions.**
-
-It first understands the payment failure using AI.
-
-Then, before any action is taken, a deterministic policy engine checks whether that action is actually allowed.
-
-### Simple flow
+> **"AI recommends. Deterministic rules decide."**
 
 ```text
-Failed Payment
-      ↓
-Understand the Failure
-      ↓
-AI Diagnosis
-      ↓
-Safety & Policy Checks
-      ↓
-┌───────────────┬────────────────┐
-│               │                │
-Approved      Blocked         Uncertain
-│               │                │
-↓               ↓                ↓
-Recovery     Stop Action     Human Review
-Action
-      ↓
-Verify Result
-      ↓
-Record Audit Trail
+Failed / Abandoned Payment
+          │
+          ▼
+ Context Retrieval (History, Error Code)
+          │
+          ▼
+   AI Diagnosis & Hypothesis
+          │
+          ▼
+ ┌───────────────────────────────────────┐
+ │     Deterministic Guardrail Engine    │
+ │  - Max 3 Retries per Transaction      │
+ │  - ₹10,000 Auto-Recovery Cap          │
+ │  - Hard Decline / Stolen Card Stop    │
+ │  - Idempotency & Deduplication Lock   │
+ │  - Minimum Confidence Floor (≥ 70%)   │
+ └──────────────────┬────────────────────┘
+                    │
+        ┌───────────┴───────────┐
+        ▼                       ▼
+  [ APPROVED ]            [ ESCALATE / BLOCK ]
+        │                       │
+        ▼                       ▼
+ Razorpay Test Action      Human Review Queue /
+ (Retry / Link / Reminder) Stop Recovery
+        │                       │
+        └───────────┬───────────┘
+                    │
+                    ▼
+         Settlement Verification
+                    │
+                    ▼
+          Immutable Audit Trail
 ```
 
-The key idea is simple:
+---
 
-> **AI recommends. Deterministic rules decide.**
+## 🎯 Intelligent Diagnosis & Decision Matrix
+
+| Failure Situation | Root Cause Class | Recovery Decision | Safety Rule Enforced |
+|---|---|---|---|
+| **Network Timeout** | Transient | Smart Retry with Backoff | Limit ≤ 3 attempts |
+| **Insufficient Funds** | Soft Decline | Alternate Payment Link / Reminder | Max 1 reminder/day |
+| **Checkout Abandoned** | Customer Drop-off | Payment Reminder Link | Idempotency check |
+| **Expired / Stolen Card** | Hard Decline | **STOP (Not Recoverable)** | Instant disqualification |
+| **Max Retries Reached** | Exhausted | **STOP (Exhausted)** | Lifetime cap = 3 |
+| **High Value (> ₹50,000)**| Risk Tier | **Human Review Escalation** | Mandatory manual approval |
 
 ---
 
-## 🎯 What Recovery AI Does
+## 🛡️ Deterministic Guardrails & Financial Safety
 
-### 1. Understands payment failures
-
-Recovery AI analyzes payment context and identifies the likely reason for failure.
-
-For example:
-
-| Payment Situation         | Recovery Decision                   |
-| ------------------------- | ----------------------------------- |
-| Network timeout           | Retry with backoff                  |
-| Insufficient funds        | Reminder / alternate payment method |
-| Checkout abandoned        | Payment reminder                    |
-| Expired card              | Stop recovery                       |
-| Stolen/fraud-related card | Stop recovery                       |
-| Too many retries          | Stop recovery                       |
-| High-value transaction    | Human review                        |
+1. **Strict 3-Retry Cap:** No transaction can ever receive unlimited retries.
+2. **₹10,000 Auto Limit:** Actions above ₹10,000 are blocked from auto-execution; > ₹50,000 requires human signoff.
+3. **Hard Decline Blacklist:** Fraud, stolen, or expired cards are never retried.
+4. **Idempotency & Replay Protection:** Prevents duplicate charges during network retries.
+5. **Human-in-the-Loop:** Low-confidence (< 70%) and edge cases automatically escalate to merchant review.
+6. **Zero Real-Money Risk:** Exclusively utilizes Razorpay Test Mode APIs.
 
 ---
 
-### 2. Applies safety rules
+## 📊 Measuring Recovery & Evaluation Benchmark
 
-AI should never have unlimited authority over financial actions.
+RevGuard measures real recovery across batches rather than hypothetical decisions:
 
-Recovery AI therefore uses deterministic guardrails such as:
+* **Revenue at Risk vs. Recovered Revenue (₹)**
+* **Recovery Conversion Rate (%)**
+* **Guardrail Blocks & Policy Enforcement Count**
+* **Processing Latency & Verification Rate**
 
-* Maximum **3 retry attempts** per transaction
-* **₹10,000** automatic recovery limit
-* Transactions above the configured high-value threshold can require human approval
-* Hard declines are blocked
-* Idempotency checks prevent duplicate execution
-* Low-confidence decisions can be escalated
-* Customer retry limits are enforced
+### Held-Out Evaluation Dataset
 
-This ensures that an AI mistake does not automatically become a financial mistake.
-
----
-
-### 3. Takes the appropriate recovery action
-
-If the action passes all safety checks, Recovery AI can perform the appropriate recovery workflow using Razorpay Test Mode APIs.
-
-Possible actions include:
-
-**Smart Retry**
-
-> Retry a payment when the failure appears temporary.
-
-**Payment Reminder**
-
-> Remind a customer when a payment was abandoned or needs another attempt.
-
-**Alternate Payment Method**
-
-> Provide another way for the customer to complete the payment.
-
-**Human Review**
-
-> Escalate uncertain, high-value, or restricted cases to a merchant.
-
----
-
-## 🛡️ Safety First
-
-Financial automation requires more than just a good AI model.
-
-Recovery AI follows a **two-layer architecture**:
-
-### Layer 1 — AI
-
-The AI analyzes the payment and produces a structured diagnosis.
-
-It answers questions such as:
-
-* Why did the payment fail?
-* Is the failure potentially recoverable?
-* What recovery action makes sense?
-* How confident is the diagnosis?
-
-The AI does **not** directly execute financial actions.
-
-### Layer 2 — Deterministic Guardrails
-
-A separate policy engine validates the AI recommendation.
-
-```text
-AI Recommendation
-       ↓
-Policy Engine
-       ↓
-Is the action allowed?
-       │
-   ┌───┴────┐
-   │        │
-  YES       NO
-   │        │
-   ↓        ↓
-Execute   Block / Review
-```
-
-This separation makes the system more predictable, auditable, and safer.
-
----
-
-## 📊 Measuring Revenue Recovery
-
-Recovery AI is designed to measure actual recovery performance across batches of failed payments.
-
-The dashboard tracks:
-
-* **Revenue at Risk**
-* **Recovered Revenue**
-* **Recovery Conversion Rate**
-* **Policy Blocks**
-* **Processing Time**
-* **Successful vs Failed Recovery Attempts**
-
-Instead of simply saying:
-
-> "The AI made a decision."
-
-Recovery AI measures:
-
-> **"How much revenue did the recovery process actually recover?"**
-
----
-
-## 🧪 Evaluation Dataset
-
-The project includes a synthetic held-out evaluation dataset covering different payment failure scenarios.
-
-| Scenario                    | Expected Behavior                   |
-| --------------------------- | ----------------------------------- |
-| `TRANSIENT_NETWORK_TIMEOUT` | Retry with backoff                  |
-| `INSUFFICIENT_FUNDS`        | Reminder / alternate payment method |
-| `EXPIRED_OR_STOLEN_CARD`    | Stop recovery                       |
-| `CHECKOUT_ABANDONMENT`      | Send payment reminder               |
-| `HIGH_VALUE_TRANSACTION`    | Human review                        |
-| `RETRY_EXHAUSTED`           | Stop recovery                       |
-
-### Run evaluation
+Includes a dedicated held-out test suite (Seed Version 2, 152 transactions, 89 eligible failures):
 
 ```bash
-# Deterministic dry run
+# Deterministic benchmark dry-run (instant)
 npm run eval -- --dry-run
 
-# Full evaluation
+# Live evaluation run (AI + Guardrails + DB)
 npm run eval
 ```
 
 ---
 
-## 🖥️ Dashboard
+## 🖥️ Merchant Dashboard
 
-Recovery AI provides a merchant dashboard for understanding and managing recovery.
-
-### Overview
-
-`/dashboard`
-
-Shows key recovery metrics such as:
-
-* Revenue at Risk
-* Recovered Revenue
-* Conversion Rate
-* Policy Blocks
-
-### Transactions
-
-`/dashboard/transactions`
-
-Search and inspect failed and recovered transactions.
-
-### Transaction Dossier
-
-`/dashboard/transactions/[id]`
-
-View the complete story of a transaction:
-
-* Failure reason
-* AI diagnosis
-* Confidence
-* Guardrail decisions
-* Recovery action
-* Final result
-
-### Batch Recovery
-
-`/dashboard/batch`
-
-Run recovery on multiple failed transactions and see the overall results.
-
-### Audit Trail
-
-`/dashboard/audit`
-
-View a chronological record of agent activity, decisions, actions, and human escalations.
-
----
-
-## 🔍 Example
-
-Imagine a customer tries to pay ₹2,000.
-
-The payment fails because of a temporary network timeout.
-
-Recovery AI sees:
-
-```text
-Failure: Network Timeout
-Amount: ₹2,000
-Previous Retries: 0
-```
-
-The AI recommends:
-
-```text
-Action: RETRY
-Confidence: High
-```
-
-The guardrail engine then checks:
-
-```text
-✓ Amount within automatic limit
-✓ Retry count below maximum
-✓ Not a hard decline
-✓ No duplicate execution
-✓ Action allowed
-```
-
-The retry is approved.
-
-If the payment succeeds:
-
-```text
-₹2,000 recovered
-```
-
-The result is verified and recorded in the audit trail.
-
----
-
-## 🧑‍💼 Human-in-the-Loop
-
-Not every payment should be handled automatically.
-
-Recovery AI sends cases to human review when:
-
-* The AI is uncertain
-* The transaction is high value
-* A policy limit is reached
-* The situation is ambiguous
-* A merchant decision is required
-
-This creates a balance between:
-
-**Automation ⚡ + Control 🛡️**
-
----
-
-## 🧾 Auditability
-
-Every important recovery step is recorded.
-
-The audit trail can contain:
-
-```text
-Payment Event
-     ↓
-AI Diagnosis
-     ↓
-Guardrail Evaluation
-     ↓
-Approved / Blocked
-     ↓
-Recovery Action
-     ↓
-Verification
-```
-
-This makes it possible to understand **what happened, why it happened, and who/what made the decision.**
-
----
-
-## 🏗️ Architecture
-
-```text
-                Merchant Payment Events
-                         │
-                         ▼
-              Context Retrieval Engine
-                         │
-                         ▼
-                  AI Diagnosis
-                         │
-                         ▼
-             Deterministic Guardrails
-                    /           \
-                   /             \
-                  ▼               ▼
-          Human Review       Recovery Action
-                                  │
-                         ┌────────┼────────┐
-                         ▼        ▼        ▼
-                       Retry   Reminder  Alternate
-                                             Method
-                                  │
-                                  ▼
-                       Settlement Verification
-                                  │
-                                  ▼
-                            Audit Trail
-                                  │
-                                  ▼
-                         Merchant Dashboard
-```
+* **Overview (`/dashboard`):** High-level KPIs (Revenue at Risk, Recovered Revenue, Recovery Rate, Policy Blocks).
+* **Transactions (`/dashboard/transactions`):** Filter and inspect failed vs. recovered payments.
+* **Transaction Dossier (`/dashboard/transactions/[id]`):** Step-by-step failure context, AI reasoning, guardrail checks, and audit trail.
+* **Batch Operations (`/dashboard/batch`):** Run high-volume recovery pipelines (10, 25, 50, 100+ txns) with live before/after metrics.
+* **Audit Trail (`/dashboard/audit`):** Complete immutable log of every agent action and human decision.
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Technology               | Purpose                      |
-| ------------------------ | ---------------------------- |
-| **Next.js 16**           | Full-stack web application   |
-| **React 19**             | User interface               |
-| **TypeScript**           | Application development      |
-| **MongoDB**              | Transaction and audit data   |
-| **OpenAI API**           | AI diagnosis                 |
-| **Zod**                  | Structured output validation |
-| **Razorpay Node.js SDK** | Payment workflows            |
-| **Tailwind CSS**         | UI styling                   |
+| Layer | Technology |
+|---|---|
+| **Fullstack Framework** | Next.js 16 (App Router, Turbopack), React 19, TypeScript |
+| **Database** | MongoDB (Native driver, indexed collections) |
+| **AI Engine** | OpenAI API (`gpt-4o-mini` with structured JSON schema outputs) |
+| **Payment Workflows** | Razorpay Node.js SDK (Test Mode) |
+| **Safety & Validation** | Zod Schema Validation & Deterministic Policy Engine |
+| **Styling** | Vanilla Tailwind CSS (Modern Dark/Light UI) |
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quick Start Guide
 
 ### Prerequisites
-
-Make sure you have:
-
 * Node.js 20+
-* MongoDB or MongoDB Atlas
-* Razorpay Test Mode credentials
+* MongoDB instance (local or MongoDB Atlas)
 * OpenAI API key
+* Razorpay Test Key ID & Secret
 
-### 1. Clone the repository
-
+### 1. Clone & Install
 ```bash
 git clone https://github.com/ravikhokle/AIRevenueRecovery.git
-
 cd AIRevenueRecovery
-```
-
-### 2. Install dependencies
-
-```bash
 npm install
 ```
 
-### 3. Configure environment variables
-
-Create a `.env.local` file:
-
+### 2. Configure Environment Variables
+Create a `.env.local` or `.env` file in the root:
 ```env
 MONGODB_URI=mongodb://localhost:27017/ai-revenue-recovery
-
 OPENAI_API_KEY=your_openai_api_key
-
 OPENAI_MODEL=gpt-4o-mini
-
-RAZORPAY_KEY_ID=rzp_test_your_key
-
+RAZORPAY_KEY_ID=rzp_test_your_key_id
 RAZORPAY_KEY_SECRET=your_razorpay_secret
 ```
 
-### 4. Seed the demo data
-
+### 3. Seed Demo Dataset
 ```bash
 npm run seed
 ```
 
-### 5. Start the application
-
+### 4. Start Development Server
 ```bash
 npm run dev
 ```
-
-Open:
-
-```text
-http://localhost:3000
-```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 🔐 Financial Safety
+## 🎥 Pitch Video & Demo
 
-Recovery AI is designed for safe experimentation.
-
-### Test Mode
-
-The project uses **Razorpay Test Mode** and synthetic transaction data.
-
-### Idempotency
-
-Duplicate execution is prevented using idempotency and deduplication checks.
-
-### Hard Stops
-
-Certain failures are never automatically retried.
-
-### Bounded Automation
-
-Recovery actions are limited by transaction amount, retry count, confidence, and policy rules.
-
-### Human Approval
-
-Sensitive or high-value cases can require human approval.
+* **Public Repository:** https://github.com/ravikhokle/AIRevenueRecovery
+* **Pitch Video:** *(Add unlisted YouTube / Loom video link)*
 
 ---
 
-## 🎥 Demo
+## 🏆 Summary
 
-**Repository**
-
-https://github.com/ravikhokle/AIRevenueRecovery
-
-**Demo Video**
-
-*Add your 5-minute demo video link here.*
-
----
-
-## 🏆 Why Recovery AI?
-
-Most payment recovery systems focus on:
-
-> **"Try the payment again."**
-
-Recovery AI focuses on:
-
-> **"Understand the failure, decide whether recovery is appropriate, and recover revenue safely."**
-
-The system combines:
-
-**AI Diagnosis**
-+
-**Deterministic Safety Rules**
-+
-**Automated Recovery**
-+
-**Human Oversight**
-+
-**Measurable Results**
-
-to create a safer approach to AI-powered revenue recovery.
-
----
-
-## 👨‍💻 Project
-
-**Recovery AI**
-
-Built for the **Razorpay AI Buildathon — Track 03: AI Revenue Recovery**
-
-**GitHub:** https://github.com/ravikhokle/AIRevenueRecovery
+| What it Solves | Bounded & Gated | What Broke & Fix |
+|---|---|---|
+| Closes the loop from payment failure detection to intelligent, compliant recovery across batches. | AI proposes diagnoses; deterministic guardrails enforce amount limits, retry caps, and safety stops before Razorpay execution. | Fixed LLM hallucination / hard-decline retry risks by demoting LLM to pure diagnosis and gating all execution behind a zero-trust policy engine. |
