@@ -87,14 +87,14 @@ Failed / Abandoned Payment
 | **Checkout Abandoned** | Customer Drop-off | Payment Reminder Link | Idempotency check |
 | **Expired / Stolen Card** | Hard Decline | **STOP (Not Recoverable)** | Instant disqualification |
 | **Max Retries Reached** | Exhausted | **STOP (Exhausted)** | Lifetime cap = 3 |
-| **High Value (> ₹50,000)**| Risk Tier | **Human Review Escalation** | Mandatory manual approval |
+| **High Value (> ₹10,000)**| Risk Tier | **Human Review Escalation** | Mandatory manual approval |
 
 ---
 
 ## 🛡️ Deterministic Guardrails & Financial Safety
 
 1. **Strict 3-Retry Cap:** No transaction can ever receive unlimited retries.
-2. **₹10,000 Auto Limit:** Actions above ₹10,000 are blocked from auto-execution; > ₹50,000 requires human signoff.
+2. **₹10,000 Auto Limit:** Actions above ₹10,000 are blocked from auto-execution;
 3. **Hard Decline Blacklist:** Fraud, stolen, or expired cards are never retried.
 4. **Idempotency & Replay Protection:** Prevents duplicate charges during network retries.
 5. **Human-in-the-Loop:** Low-confidence (< 70%) and edge cases automatically escalate to merchant review.
