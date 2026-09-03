@@ -16,28 +16,31 @@ export async function getAuditLogCollection(): Promise<Collection<AuditLog>> {
  *
  * NOTE: Audit logs are IMMUTABLE. No update or delete indexes are created.
  */
+let _indexesEnsured = false;
+
 export async function ensureAuditLogIndexes(): Promise<void> {
-  const collection = await getAuditLogCollection();
+  if (_indexesEnsured) return;
+  _indexesEnsured = true;
 
-  const indexes: IndexDescription[] = [
-    // Primary lookup: all events for a transaction, ordered by time
-    { key: { transactionId: 1, timestamp: 1 } },
+  try {
+    const collection = await getAuditLogCollection();
 
-    // Unique constraint on the generated log ID
-    { key: { logId: 1 }, unique: true },
+    const indexes: IndexDescription[] = [
+      // Primary lookup: all events for a transaction, ordered by time
+      { key: { transactionId: 1, timestamp: 1 } },
 
-    // Query by event type across all transactions
-    { key: { eventType: 1, timestamp: -1 } },
+      // Unique constraint on the generated log ID
+      { key: { logId: 1 }, unique: true },
 
-    // Query by actor (human reviewer, system, etc.)
-    { key: { actor: 1, timestamp: -1 } },
+      // Query by event type across all transactions
+      { key: { eventType: 1, timestamp: -1 } },
 
-    // TTL: auto-delete logs older than 365 days (compliance retention)
-    {
-      key: { timestamp: 1 },
-      expireAfterSeconds: 365 * 24 * 60 * 60,
-    },
-  ];
+      // Query by actor (human reviewer, system, etc.)
+      { key: { actor: 1, timestamp: -1 } },
+    ];
 
-  await collection.createIndexes(indexes);
+    await collection.createIndexes(indexes);
+  } catch (err) {
+    console.warn("Could not ensure audit log indexes:", err);
+  }
 }

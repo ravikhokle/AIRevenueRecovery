@@ -61,9 +61,9 @@ export const CustomerHistorySchema = z.object({
   abandonedPaymentCount: z.number().int().nonnegative(),
   totalSpent: z.number().int().nonnegative(),
   averageOrderValue: z.number().int().nonnegative(),
-  lastSuccessfulPaymentAt: z.date().nullable(),
-  lastFailedPaymentAt: z.date().nullable(),
-  preferredPaymentMethod: z.string().nullable(),
+  lastSuccessfulPaymentAt: z.coerce.date().nullable().optional(),
+  lastFailedPaymentAt: z.coerce.date().nullable().optional(),
+  preferredPaymentMethod: z.string().nullable().optional(),
 });
 
 export type CustomerHistory = z.infer<typeof CustomerHistorySchema>;
@@ -74,22 +74,22 @@ export type CustomerHistory = z.infer<typeof CustomerHistorySchema>;
 export const TransactionDetailsSchema = z.object({
   transactionId: z.string(),
   amount: z.number().int().positive(),
-  currency: z.string().length(3),
-  status: z.enum(["FAILED", "ABANDONED", "PENDING"]),
+  currency: z.string().min(1).max(10),
+  status: z.enum(["FAILED", "ABANDONED", "PENDING", "SUCCESS"]),
   paymentMethod: z.string(),
-  failureReason: z.string().nullable(),
+  failureReason: z.string().nullable().optional(),
   gatewayError: z
     .object({
       code: z.string(),
       source: z.string(),
       step: z.string(),
       description: z.string(),
-      reason: z.string(),
+      reason: z.string().optional(),
     })
     .nullable()
     .optional(),
   retryCount: z.number().int().nonnegative(),
-  createdAt: z.date(),
+  createdAt: z.coerce.date(),
 });
 
 export type TransactionDetails = z.infer<typeof TransactionDetailsSchema>;
@@ -100,8 +100,8 @@ export type TransactionDetails = z.infer<typeof TransactionDetailsSchema>;
 export const RetryHistorySchema = z.object({
   totalRetries: z.number().int().nonnegative(),
   failureReasons: z.array(z.string()),
-  lastRetryAt: z.date().nullable(),
-  retryPattern: z.enum(["CONSISTENT", "INTERMITTENT", "SINGLE"]),
+  lastRetryAt: z.coerce.date().nullable().optional(),
+  retryPattern: z.enum(["CONSISTENT", "INTERMITTENT", "SINGLE"]).optional(),
 });
 
 export type RetryHistory = z.infer<typeof RetryHistorySchema>;
@@ -118,3 +118,4 @@ export const RecoveryAnalysisInputSchema = z.object({
 export type RecoveryAnalysisInput = z.infer<
   typeof RecoveryAnalysisInputSchema
 >;
+

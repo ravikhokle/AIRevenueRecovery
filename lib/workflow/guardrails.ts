@@ -165,21 +165,22 @@ export class GuardrailEngine {
     }
 
     // RULE 8: Transaction must not receive unlimited recovery attempts (MAX = 3)
-    if (retryCount >= this.config.maxRetriesPerTransaction) {
+    const effectiveAttempts = Math.max(retryCount, previousAttempts);
+    if (effectiveAttempts >= this.config.maxRetriesPerTransaction) {
       throw new GuardrailRejectionError(
-        `RULE 8 ENFORCED: Transaction already retried ${retryCount} times (max: 3)`,
+        `RULE 8 ENFORCED: Transaction already retried ${effectiveAttempts} times (max: ${this.config.maxRetriesPerTransaction})`,
         "RETRY_LIMIT",
         `Maximum retry attempts (${this.config.maxRetriesPerTransaction}) exceeded - no further recovery attempts allowed`
       );
     }
 
-    // RULE 5: Duplicate transactions/actions must be prevented
+    // RULE 5: Duplicate actions must be prevented on already settled/successful transactions
     if (!this.config.allowDuplicateTransactions) {
-      if (previousAttempts > 0 && recommendation.recommendedAction === "RETRY") {
+      if (transaction.status === "SUCCESS") {
         throw new GuardrailRejectionError(
-          `RULE 5 ENFORCED: Duplicate recovery attempt detected (${previousAttempts} previous)`,
+          "RULE 5 ENFORCED: Transaction is already marked SUCCESS - duplicate recovery blocked",
           "DUPLICATE_PREVENTION",
-          `Transaction already has ${previousAttempts} recovery attempt(s) - preventing duplicate action`
+          "Transaction was already successfully recovered and settled"
         );
       }
     }
@@ -211,17 +212,16 @@ export class GuardrailEngine {
       );
     }
 
-    // Customer Success Rate Policy
-    const successRate = customer.totalTransactions > 0
-      ? customer.successfulPaymentCount / customer.totalTransactions
-      : 0;
-
-    if (successRate < this.config.minSuccessRateForRetry && recommendation.recommendedAction === "RETRY") {
-      throw new GuardrailRejectionError(
-        `Customer success rate ${(successRate * 100).toFixed(1)}% below minimum ${(this.config.minSuccessRateForRetry * 100).toFixed(1)}%`,
-        "CUSTOMER_POLICY",
-        `Customer's payment reliability is too low for automatic retry`
-      );
+    // Customer Success Rate Policy (applied when customer has established history of 3+ transactions)
+    if (customer.totalTransactions >= 3 && recommendation.recommendedAction === "RETRY") {
+      const successRate = customer.successfulPaymentCount / customer.totalTransactions;
+      if (successRate < this.config.minSuccessRateForRetry) {
+        throw new GuardrailRejectionError(
+          `Customer success rate ${(successRate * 100).toFixed(1)}% below minimum ${(this.config.minSuccessRateForRetry * 100).toFixed(1)}%`,
+          "CUSTOMER_POLICY",
+          `Customer's payment reliability is too low for automatic retry`
+        );
+      }
     }
 
     // All guardrails passed - decision structure

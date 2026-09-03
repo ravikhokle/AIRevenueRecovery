@@ -26,7 +26,7 @@ function getMongoUri(): string {
 }
 
 function getDbName(): string | undefined {
-  return process.env[MONGODB_DB_NAME_ENV];
+  return process.env[MONGODB_DB_NAME_ENV] || "ai-revenue-recovery";
 }
 
 declare global {
@@ -34,28 +34,35 @@ declare global {
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
-function createClientPromise(): Promise<MongoClient> {
+async function createClientPromise(): Promise<MongoClient> {
   const uri = getMongoUri();
   const client = new MongoClient(uri);
 
-  return client.connect().catch((error: unknown) => {
-    const message =
-      error instanceof Error ? error.message : "Failed to connect to MongoDB";
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await client.connect();
+      return client;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
+    }
+  }
 
-    throw new DatabaseConnectionError(message, error);
-  });
+  global._mongoClientPromise = undefined;
+  const message =
+    lastError instanceof Error ? lastError.message : "Failed to connect to MongoDB";
+  throw new DatabaseConnectionError(message, lastError);
 }
 
 function getClientPromise(): Promise<MongoClient> {
-  if (process.env.NODE_ENV === "development") {
-    if (!global._mongoClientPromise) {
-      global._mongoClientPromise = createClientPromise();
-    }
-
-    return global._mongoClientPromise;
+  if (!global._mongoClientPromise) {
+    global._mongoClientPromise = createClientPromise();
   }
 
-  return createClientPromise();
+  return global._mongoClientPromise;
 }
 
 export async function connectToDatabase(): Promise<{

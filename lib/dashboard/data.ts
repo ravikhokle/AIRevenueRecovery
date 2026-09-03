@@ -39,44 +39,23 @@ export interface DashboardMetrics {
 
 export async function getDashboardOverviewMetrics(): Promise<DashboardMetrics> {
   try {
-    const batchCollection = await getBatchRunCollection();
-    const latestRun = await batchCollection
-      .find({ status: "COMPLETED" })
-      .sort({ startedAt: -1 })
-      .limit(1)
-      .toArray();
-
-    if (latestRun.length > 0 && latestRun[0].summary) {
-      const s = latestRun[0].summary;
-      return {
-        revenueAtRisk: s.revenueAtRisk,
-        revenueRecovered: s.revenueRecovered,
-        recoveryRate: s.revenueRecoveryRate,
-        transactionsAnalyzed: s.totalTransactions,
-        recoverableCases: s.recoverableCases,
-        humanReviews: s.humanReviews,
-        guardrailBlocks: s.guardrailBlocks,
-        failedActions: s.failedRecoveryActions,
-      };
-    }
-
-    // If no batch run, aggregate from live DB
     const txCollection = await getTransactionsCollection();
     const allTxns = await txCollection.find({}).toArray();
 
     if (allTxns.length > 0) {
+      // 1. Total at-risk failed/abandoned volume across all transactions
       const atRiskTxns = allTxns.filter(
         (t) => t.status === "FAILED" || t.status === "ABANDONED"
       );
       const revenueAtRisk = atRiskTxns.reduce((sum, t) => sum + t.amount, 0);
 
+      // 2. Verified recoveries from audit logs
       const auditCollection = await getAuditLogCollection();
       const allAudit = await auditCollection.find({}).toArray();
 
       let recoverableCases = 0;
       let humanReviews = 0;
       let guardrailBlocks = 0;
-      let successfulRecoveries = 0;
       let failedActions = 0;
       let revenueRecovered = 0;
       const analyzedTxnIds = new Set<string>();
@@ -104,9 +83,10 @@ export async function getDashboardOverviewMetrics(): Promise<DashboardMetrics> {
           if (log.result === "SUCCESS" || log.result === "VERIFIED") {
             if (!recoveredTxnIds.has(log.transactionId)) {
               recoveredTxnIds.add(log.transactionId);
-              successfulRecoveries += 1;
               const txn = txnMap.get(log.transactionId);
-              if (txn) revenueRecovered += txn.amount;
+              if (txn) {
+                revenueRecovered += txn.amount;
+              }
             }
           } else {
             failedActions += 1;
@@ -114,10 +94,25 @@ export async function getDashboardOverviewMetrics(): Promise<DashboardMetrics> {
         }
       }
 
+      // Also count transactions that were updated to SUCCESS after recovery
+      for (const t of allTxns) {
+        if (t.status === "SUCCESS" && !recoveredTxnIds.has(t.transactionId)) {
+          const hasRecoveryLog = allAudit.some(
+            (l) => l.transactionId === t.transactionId && (l.eventType === "ACTION_VERIFIED" || l.eventType === "ACTION_EXECUTED")
+          );
+          if (hasRecoveryLog) {
+            recoveredTxnIds.add(t.transactionId);
+            revenueRecovered += t.amount;
+          }
+        }
+      }
+
+      const totalBaseRisk = revenueAtRisk + revenueRecovered;
+
       return {
-        revenueAtRisk,
+        revenueAtRisk: totalBaseRisk > 0 ? totalBaseRisk : revenueAtRisk,
         revenueRecovered,
-        recoveryRate: revenueAtRisk > 0 ? revenueRecovered / revenueAtRisk : 0,
+        recoveryRate: totalBaseRisk > 0 ? revenueRecovered / totalBaseRisk : 0,
         transactionsAnalyzed: analyzedTxnIds.size,
         recoverableCases,
         humanReviews,
@@ -126,7 +121,7 @@ export async function getDashboardOverviewMetrics(): Promise<DashboardMetrics> {
       };
     }
   } catch (error) {
-    console.warn("Could not query DB for metrics, falling back to synthetic dataset baseline:", error);
+    console.warn("Could not query DB for store metrics, falling back to synthetic dataset:", error);
   }
 
   // Fallback to static synthetic dataset baseline
@@ -150,17 +145,26 @@ export async function getDashboardOverviewMetrics(): Promise<DashboardMetrics> {
 
 export async function getEnrichedTransactions(options: {
   status?: string;
+  search?: string;
   limit?: number;
   skip?: number;
 } = {}): Promise<{ transactions: EnrichedTransaction[]; total: number }> {
   const limit = options.limit ?? 50;
   const skip = options.skip ?? 0;
+  const search = options.search?.trim().toLowerCase();
 
   try {
     const txCollection = await getTransactionsCollection();
     const query: Record<string, unknown> = {};
     if (options.status && options.status !== "ALL") {
       query.status = options.status;
+    }
+    if (search) {
+      query.$or = [
+        { transactionId: { $regex: search, $options: "i" } },
+        { customerId: { $regex: search, $options: "i" } },
+        { orderId: { $regex: search, $options: "i" } },
+      ];
     }
 
     const [txns, total] = await Promise.all([
@@ -260,6 +264,14 @@ export async function getEnrichedTransactions(options: {
   if (options.status && options.status !== "ALL") {
     filtered = filtered.filter((t) => t.status === options.status);
   }
+  if (search) {
+    filtered = filtered.filter(
+      (t) =>
+        t.transactionId.toLowerCase().includes(search) ||
+        t.customerId.toLowerCase().includes(search) ||
+        t.orderId.toLowerCase().includes(search)
+    );
+  }
   const total = filtered.length;
   const page = filtered.slice(skip, skip + limit);
 
@@ -294,19 +306,23 @@ export async function getTransactionDetail(transactionId: string): Promise<{
   let auditTrail: AuditLog[] = [];
 
   try {
-    const txCollection = await getTransactionsCollection();
-    transaction = await txCollection.findOne({ transactionId });
+    const [txCollection, auditCollection] = await Promise.all([
+      getTransactionsCollection(),
+      getAuditLogCollection(),
+    ]);
+
+    const [foundTx, foundAudit] = await Promise.all([
+      txCollection.findOne({ transactionId }),
+      auditCollection.find({ transactionId }).sort({ timestamp: 1 }).toArray(),
+    ]);
+
+    transaction = foundTx;
+    auditTrail = foundAudit;
 
     if (transaction) {
       const custCollection = await getCustomersCollection();
       customer = await custCollection.findOne({ customerId: transaction.customerId });
     }
-
-    const auditCollection = await getAuditLogCollection();
-    auditTrail = await auditCollection
-      .find({ transactionId })
-      .sort({ timestamp: 1 })
-      .toArray();
   } catch (error) {
     console.warn(`Could not load details for ${transactionId} from DB:`, error);
   }

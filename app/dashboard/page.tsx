@@ -11,132 +11,95 @@ export const dynamic = "force-dynamic";
 export default async function DashboardOverviewPage() {
   const [metrics, { transactions, total }] = await Promise.all([
     getDashboardOverviewMetrics(),
-    getEnrichedTransactions({ limit: 10 }),
+    getEnrichedTransactions({ limit: 8 }),
   ]);
 
   return (
     <div>
-      <div className="page-header flex items-center justify-between">
+      <div className="page-header flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="page-title">Merchant Revenue Recovery Dashboard</h1>
+          <h1 className="page-title">Revenue Recovery Dashboard</h1>
           <p className="page-subtitle">
-            Autonomous AI agent monitoring failed payments, evaluating recovery strategies, and executing verified actions within guardrails.
+            Monitor failed payments, AI recovery decisions, guardrail outcomes,
+            and verified revenue gains in one clean operating view.
           </p>
         </div>
-        <div className="flex gap-3">
-          <Link href="/dashboard/batch" className="btn btn-primary">
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            Batch Recovery
-          </Link>
-        </div>
+
+        <Link href="/dashboard/batch" className="btn btn-primary">
+          Run Recovery Pipeline
+        </Link>
       </div>
 
       <div className="page-body">
-        {/* Core KPI metrics grid */}
-        <div className="metrics-grid">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="metric-card">
-            <div className="metric-label">Revenue at Risk</div>
+            <div className="metric-label">
+              <span>Total Revenue at Risk</span>
+              <span className="badge badge-amber">Risk</span>
+            </div>
             <div className="metric-value amber">
               {formatRupeesLong(metrics.revenueAtRisk)}
             </div>
-            <div className="metric-sub">Total failed & abandoned volume</div>
+            <div className="metric-sub">
+              Remaining:{" "}
+              <span className="font-mono font-semibold text-slate-300">
+                {formatRupeesLong(
+                  Math.max(0, metrics.revenueAtRisk - metrics.revenueRecovered),
+                )}
+              </span>
+            </div>
           </div>
 
           <div className="metric-card">
-            <div className="metric-label">Revenue Recovered</div>
+            <div className="metric-label">
+              <span>Revenue Recovered</span>
+              <span className="badge badge-green">Paid</span>
+            </div>
             <div className="metric-value green">
               {formatRupeesLong(metrics.revenueRecovered)}
             </div>
-            <div className="metric-sub">Successfully processed & verified</div>
+            <div className="metric-sub">Verified through payment gateway</div>
           </div>
 
           <div className="metric-card">
-            <div className="metric-label">Recovery Rate</div>
+            <div className="metric-label">
+              <span>Recovery Rate</span>
+              <span className="badge badge-blue">Rate</span>
+            </div>
             <div className="metric-value blue">
               {formatPct(metrics.recoveryRate, 1)}
             </div>
-            <div className="metric-sub">Recovered / at-risk volume</div>
+            <div className="metric-sub">Overall revenue recaptured</div>
           </div>
 
           <div className="metric-card">
-            <div className="metric-label">Transactions Analyzed</div>
-            <div className="metric-value">
-              {metrics.transactionsAnalyzed}
+            <div className="metric-label">
+              <span>Transactions Resolved</span>
+              <span className="badge badge-purple">Ops</span>
             </div>
-            <div className="metric-sub">Processed through AI pipeline</div>
-          </div>
-
-          <div className="metric-card">
-            <div className="metric-label">Recoverable Cases</div>
-            <div className="metric-value green">
-              {metrics.recoverableCases}
+            <div className="metric-value">{metrics.transactionsAnalyzed}</div>
+            <div className="metric-sub">
+              {metrics.guardrailBlocks} guardrail blocks / {metrics.humanReviews} review
             </div>
-            <div className="metric-sub">AI classified recoverable</div>
-          </div>
-
-          <div className="metric-card">
-            <div className="metric-label">Human Reviews</div>
-            <div className="metric-value purple">
-              {metrics.humanReviews}
-            </div>
-            <div className="metric-sub">Escalated by policy rules</div>
-          </div>
-
-          <div className="metric-card">
-            <div className="metric-label">Guardrail Blocks</div>
-            <div className="metric-value red">
-              {metrics.guardrailBlocks}
-            </div>
-            <div className="metric-sub">Prevented unauthorized actions</div>
-          </div>
-
-          <div className="metric-card">
-            <div className="metric-label">Failed Actions</div>
-            <div className="metric-value text-muted">
-              {metrics.failedActions}
-            </div>
-            <div className="metric-sub">Unsuccessful retry attempts</div>
           </div>
         </div>
 
-        {/* Transactions Table Section */}
         <div className="card">
-          <div className="card-header">
-            <div>
+          <div className="card-header flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <span className="card-title">Recent Transactions</span>
-              <span className="text-muted text-xs ml-2">
-                (Showing latest {transactions.length} of {total})
+              <span className="text-xs text-slate-400 font-mono">
+                ({total} total in store)
               </span>
             </div>
-            <Link
-              href="/dashboard/transactions"
-              className="btn btn-secondary btn-sm"
-            >
-              View All Transactions →
+            <Link href="/dashboard/transactions" className="btn btn-secondary btn-sm">
+              View All Transactions
             </Link>
           </div>
 
           <TransactionsTable
             transactions={transactions}
-            emptyMessage="No transaction records available. Run a batch recovery to analyze payments."
+            emptyMessage="No transaction records found. Run the recovery pipeline to process payment failures."
           />
         </div>
       </div>

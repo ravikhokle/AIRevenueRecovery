@@ -14,19 +14,28 @@ export async function getBatchRunCollection(): Promise<Collection<BatchRun>> {
  * Create indexes for the batch_runs collection.
  * Called once before first read/write.
  */
+let _batchIndexesEnsured = false;
+
 export async function ensureBatchRunIndexes(): Promise<void> {
-  const collection = await getBatchRunCollection();
+  if (_batchIndexesEnsured) return;
+  _batchIndexesEnsured = true;
 
-  const indexes: IndexDescription[] = [
-    // Primary key
-    { key: { batchId: 1 }, unique: true },
+  try {
+    const collection = await getBatchRunCollection();
 
-    // List runs by recency
-    { key: { startedAt: -1 } },
+    const indexes: IndexDescription[] = [
+      // Primary key
+      { key: { batchId: 1 }, unique: true },
 
-    // Filter by status
-    { key: { status: 1, startedAt: -1 } },
-  ];
+      // List runs by recency
+      { key: { startedAt: -1 } },
 
-  await collection.createIndexes(indexes);
+      // Filter by status
+      { key: { status: 1, startedAt: -1 } },
+    ];
+
+    await collection.createIndexes(indexes);
+  } catch (err) {
+    console.warn("Could not ensure batch run indexes:", err);
+  }
 }

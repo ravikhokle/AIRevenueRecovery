@@ -26,6 +26,7 @@ import {
   getBatchRunCollection,
   ensureBatchRunIndexes,
 } from "@/lib/models/batch-run";
+import { getAuditLogCollection } from "@/lib/models/audit-log";
 import { createGuardrailEngine } from "@/lib/workflow/guardrails";
 import { createActionExecutor } from "@/lib/workflow/actions";
 import { getAuditTrailService } from "@/lib/workflow/audit";
@@ -199,16 +200,68 @@ export class BatchProcessor {
     const sourceTransactions = this.customTransactions ?? dataset.transactions;
 
     // Filter to eligible transactions only: FAILED or ABANDONED
-    // Sort by transactionId for stable, reproducible ordering
+    // Sort by transactionId for stable, reproducible baseline ordering
     const eligibleTransactions = sourceTransactions
       .filter((t) => t.status === "FAILED" || t.status === "ABANDONED")
       .sort((a, b) => a.transactionId.localeCompare(b.transactionId));
 
+    // Intelligently prioritize transactions that have not yet hit retry limit or already recovered
+    let prioritizedTransactions = eligibleTransactions;
+    if (!this.dryRun) {
+      try {
+        const auditCollection = await getAuditLogCollection();
+        const logs = await auditCollection
+          .find({
+            eventType: { $in: ["ACTION_EXECUTED", "ACTION_VERIFIED"] },
+          })
+          .project({ transactionId: 1, eventType: 1, result: 1 })
+          .toArray();
+
+        const executionCounts = new Map<string, number>();
+        const verifiedRecoveries = new Set<string>();
+
+        for (const log of logs) {
+          if (log.eventType === "ACTION_EXECUTED") {
+            executionCounts.set(
+              log.transactionId,
+              (executionCounts.get(log.transactionId) || 0) + 1
+            );
+          }
+          if (
+            log.eventType === "ACTION_VERIFIED" &&
+            (log.result === "SUCCESS" || log.result === "VERIFIED")
+          ) {
+            verifiedRecoveries.add(log.transactionId);
+          }
+        }
+
+        // Fresh transactions: unrecovered and retried fewer than 3 times
+        const freshTransactions = eligibleTransactions.filter(
+          (t) =>
+            !verifiedRecoveries.has(t.transactionId) &&
+            (executionCounts.get(t.transactionId) || 0) < 3
+        );
+        const exhaustedTransactions = eligibleTransactions.filter(
+          (t) =>
+            verifiedRecoveries.has(t.transactionId) ||
+            (executionCounts.get(t.transactionId) || 0) >= 3
+        );
+
+        prioritizedTransactions = [...freshTransactions, ...exhaustedTransactions];
+      } catch (err) {
+        console.warn(
+          "Could not query audit logs for batch prioritization, using default order:",
+          err
+        );
+        prioritizedTransactions = eligibleTransactions;
+      }
+    }
+
     // Apply optional limit
     const toProcess =
       this.limit !== undefined
-        ? eligibleTransactions.slice(0, this.limit)
-        : eligibleTransactions;
+        ? prioritizedTransactions.slice(0, this.limit)
+        : prioritizedTransactions;
 
     // ── 2. Build workflow dependencies (once per batch) ───────────────────
     // In dry-run mode these are never actually called, but we still
@@ -327,6 +380,14 @@ export class BatchProcessor {
     }
 
     const outcome = classifyOutcome(ctx);
+    const errorMessage =
+      outcome === "ACTION_FAILED"
+        ? ctx.actionExecution?.error?.message ||
+          (ctx.actionExecution?.result &&
+          ctx.actionExecution.result.status !== "SUCCESS"
+            ? ctx.actionExecution.result.message
+            : "Action could not be verified on payment gateway")
+        : undefined;
 
     return {
       transactionId: transaction.transactionId,
@@ -339,6 +400,7 @@ export class BatchProcessor {
       actionExecuted: !!ctx.actionExecution,
       actionVerified: ctx.actionVerified ?? false,
       auditLogId: ctx.auditEvent?.auditId,
+      errorMessage,
       processingMs: Date.now() - txStart,
     };
   }
@@ -525,27 +587,29 @@ export class BatchProcessor {
     const txCollection = await getTransactionsCollection();
     const custCollection = await getCustomersCollection();
 
-    // Upsert transactions (by transactionId)
-    await Promise.all(
-      transactions.map((t) =>
-        txCollection.replaceOne(
-          { transactionId: t.transactionId },
-          t as any,
-          { upsert: true }
-        )
-      )
-    );
+    if (transactions.length > 0) {
+      await txCollection.bulkWrite(
+        transactions.map((t) => ({
+          replaceOne: {
+            filter: { transactionId: t.transactionId },
+            replacement: t as any,
+            upsert: true,
+          },
+        }))
+      );
+    }
 
-    // Upsert customers (by customerId)
-    await Promise.all(
-      customers.map((c) =>
-        custCollection.replaceOne(
-          { customerId: c.customerId },
-          c,
-          { upsert: true }
-        )
-      )
-    );
+    if (customers.length > 0) {
+      await custCollection.bulkWrite(
+        customers.map((c) => ({
+          replaceOne: {
+            filter: { customerId: c.customerId },
+            replacement: c,
+            upsert: true,
+          },
+        }))
+      );
+    }
   }
 
   // -------------------------------------------------------------------------

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "RecoverAI – Revenue Recovery Agent",
+    default: "RecoverAI - Revenue Recovery Agent",
     template: "%s | RecoverAI",
   },
   description:

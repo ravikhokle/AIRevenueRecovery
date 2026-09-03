@@ -23,7 +23,6 @@ export function RunWorkflowButton({
   const [showReviewModal, setShowReviewModal] = useState(false);
   const router = useRouter();
 
-  // 1. Run Automated AI Workflow
   const handleRun = async () => {
     setLoading(true);
     setMessage(null);
@@ -56,7 +55,6 @@ export function RunWorkflowButton({
     }
   };
 
-  // 2. Submit Human-in-the-Loop Operator Decision
   const handleHumanReview = async (decision: "APPROVE" | "REJECT") => {
     setLoading(true);
     setMessage(null);
@@ -81,7 +79,9 @@ export function RunWorkflowButton({
 
       setMessage({
         type: "success",
-        text: `Human review decision recorded: ${decision} (Verified: ${data.actionVerified ? "Yes" : "No"})`,
+        text: `Human review decision recorded: ${decision} (Verified: ${
+          data.actionVerified ? "Yes" : "No"
+        })`,
       });
       setShowReviewModal(false);
       router.refresh();
@@ -97,11 +97,12 @@ export function RunWorkflowButton({
 
   return (
     <div className="flex flex-col gap-2 items-end">
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap justify-end">
         <button
           onClick={handleRun}
           disabled={loading}
           className="btn btn-secondary btn-sm"
+          title={`Run AI recovery workflow for ${status.toLowerCase()} transaction`}
         >
           {loading ? (
             <>
@@ -109,60 +110,33 @@ export function RunWorkflowButton({
               Processing...
             </>
           ) : (
-            <>
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
-              </svg>
-              Run AI Analysis
-            </>
+            "Run AI Analysis"
           )}
         </button>
 
         <button
           onClick={() => setShowReviewModal(!showReviewModal)}
           className="btn btn-primary btn-sm"
+          title={isEscalated ? "Review escalated case" : "Record operator decision"}
         >
-          <svg
-            className="w-3.5 h-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
           Human Decision
         </button>
       </div>
 
       {showReviewModal && (
-        <div className="p-3 bg-surface border border-border rounded-lg shadow-xl mt-2 w-80 flex flex-col gap-2.5 z-10">
-          <div className="text-xs font-semibold text-primary">
+        <div className="panel-soft mt-2 w-80 p-3 shadow-lg flex flex-col gap-2.5 z-10">
+          <div className="text-xs font-bold text-slate-100">
             Operator Review & Execution
           </div>
-          <p className="text-xs text-secondary">
-            Explicitly authorize or reject recovery action with full operator attribution.
+          <p className="text-xs text-slate-400">
+            Authorize or reject the recovery action with operator attribution.
           </p>
           <input
             type="text"
-            placeholder="Optional review notes..."
+            placeholder="Optional review notes"
             value={operatorNotes}
             onChange={(e) => setOperatorNotes(e.target.value)}
-            className="w-full px-2 py-1 text-xs bg-raised border border-border rounded text-primary"
+            className="input-text w-full text-xs"
           />
           <div className="flex gap-2 justify-end">
             <button
@@ -185,10 +159,10 @@ export function RunWorkflowButton({
 
       {message && (
         <div
-          className={`text-xs px-2.5 py-1 rounded ${
+          className={`text-xs px-3 py-2 rounded-md border ${
             message.type === "success"
-              ? "bg-green-dim text-green border border-green-dim"
-              : "bg-red-dim text-red border border-red-dim"
+              ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/40"
+              : "bg-rose-950/40 text-rose-300 border-rose-800/60"
           }`}
         >
           {message.text}

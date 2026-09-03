@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "tsx --env-file=.env.local scripts/seed.ts"
+    "seed": "tsx --env-file-if-exists=.env.local --env-file-if-exists=.env scripts/seed.ts",
+    "eval": "tsx --env-file-if-exists=.env.local --env-file-if-exists=.env scripts/eval.ts"
   },
   "dependencies": {
     "mongodb": "^7.6.0",
@@ -26,6 +27,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }

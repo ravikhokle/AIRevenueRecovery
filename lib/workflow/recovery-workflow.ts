@@ -247,7 +247,8 @@ export class RecoveryWorkflow {
           currency: context.transaction.currency,
           status: context.transaction.status,
           paymentMethod: context.transaction.paymentMethod,
-          failureReason: context.transaction.failureReason,
+          failureReason: context.transaction.failureReason ?? null,
+          gatewayError: context.transaction.gatewayError ?? null,
           retryCount: context.transaction.retryCount,
           createdAt: context.transaction.createdAt,
         },
@@ -258,14 +259,15 @@ export class RecoveryWorkflow {
           abandonedPaymentCount: context.customer.abandonedPaymentCount,
           totalSpent: context.customer.totalSpent,
           averageOrderValue: context.customer.averageOrderValue,
-          lastSuccessfulPaymentAt: context.customer.lastSuccessfulPaymentAt,
-          lastFailedPaymentAt: context.customer.lastFailedPaymentAt,
-          preferredPaymentMethod: context.customer.preferredPaymentMethod,
+          lastSuccessfulPaymentAt: context.customer.lastSuccessfulPaymentAt ?? null,
+          lastFailedPaymentAt: context.customer.lastFailedPaymentAt ?? null,
+          preferredPaymentMethod: context.customer.preferredPaymentMethod ?? null,
         },
         retryHistory: {
           totalRetries: context.retryHistory.totalRetries,
           failureReasons: context.retryHistory.failureReasons,
           retryPattern: context.retryHistory.retryPattern,
+          lastRetryAt: null,
         },
       };
 
@@ -560,6 +562,19 @@ export class RecoveryWorkflow {
       auditAction,
       verified
     );
+
+    // If verified, update transaction record status to SUCCESS in DB
+    if (verified) {
+      try {
+        const collection = await getTransactionsCollection();
+        await collection.updateOne(
+          { transactionId: context.transactionId },
+          { $set: { status: "SUCCESS", updatedAt: new Date() } }
+        );
+      } catch (err) {
+        console.warn("Could not update transaction status in DB:", err);
+      }
+    }
   }
 
   /**

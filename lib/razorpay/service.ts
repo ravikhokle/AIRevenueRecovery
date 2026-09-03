@@ -54,11 +54,12 @@ export class RazorpayRecoveryService {
     customerId: string;
     actionId: string;
   }): Promise<RazorpayOrderResult> {
+    const isDemoMode = process.env.RECOVERY_DEMO_MODE === "true";
     const client = getRazorpayClient();
     const receipt = `rcpt_${params.transactionId.replace(/[^a-zA-Z0-9_]/g, "").slice(-16)}_${params.actionId.slice(-8)}`;
 
-    if (!client) {
-      // Deterministic test-mode simulation when credentials not in env
+    if (!client || isDemoMode) {
+      // Deterministic test-mode simulation when credentials not in env or running in demo mode
       return {
         orderId: `order_test_${params.actionId.slice(-14)}`,
         amount: params.amount,
@@ -116,10 +117,11 @@ export class RazorpayRecoveryService {
     customerPhone?: string | null;
     customerName?: string | null;
   }): Promise<RazorpayPaymentLinkResult> {
+    const isDemoMode = process.env.RECOVERY_DEMO_MODE === "true";
     const client = getRazorpayClient();
 
-    if (!client) {
-      // Deterministic test-mode simulation when credentials not in env
+    if (!client || isDemoMode) {
+      // Deterministic test-mode simulation when credentials not in env or running in demo mode
       return {
         paymentLinkId: `plink_test_${params.actionId.slice(-14)}`,
         shortUrl: `https://rzp.io/i/test_${params.actionId.slice(-8)}`,
@@ -268,9 +270,23 @@ export class RazorpayRecoveryService {
       };
     }
 
+    const isDemoMode = process.env.RECOVERY_DEMO_MODE === "true";
     const client = getRazorpayClient();
 
-    // Live/Real Test Mode verification via SDK
+    // Deterministic simulated test-mode verification for demo mode:
+    // When running in DEMO mode with synthetic data, verifies the initialized test-mode action
+    if (isDemoMode) {
+      if (params.razorpayOrderId || params.razorpayPaymentLinkId) {
+        return {
+          settled: true,
+          gatewayStatus: "paid",
+          amountRecovered: params.amount,
+          reason: "Verified settlement in Razorpay Test Mode environment (Demo Simulation)",
+        };
+      }
+    }
+
+    // Live/Real Test Mode verification via SDK (when DEMO mode is OFF)
     if (client) {
       if (params.razorpayOrderId && !params.razorpayOrderId.startsWith("order_test_")) {
         const order = await this.fetchOrderStatus(params.razorpayOrderId);
@@ -279,7 +295,9 @@ export class RazorpayRecoveryService {
           settled,
           gatewayStatus: order.status,
           amountRecovered: settled ? params.amount : 0,
-          reason: settled ? "Payment successfully captured on Razorpay gateway" : `Order in '${order.status}' state (unpaid)`,
+          reason: settled
+            ? "Payment successfully captured on Razorpay gateway"
+            : `Order in '${order.status}' state (unpaid)`,
         };
       }
 
@@ -290,13 +308,14 @@ export class RazorpayRecoveryService {
           settled,
           gatewayStatus: link.status,
           amountRecovered: settled ? params.amount : 0,
-          reason: settled ? "Payment link settled by customer" : `Payment link in '${link.status}' state (pending customer checkout)`,
+          reason: settled
+            ? "Payment link settled by customer"
+            : `Payment link in '${link.status}' state (pending customer checkout)`,
         };
       }
     }
 
-    // Deterministic simulated test-mode verification (for demonstrations & CI):
-    // Validates that the resource was legitimately initialized and test-settled
+    // Fallback when client is not configured
     if (params.razorpayOrderId || params.razorpayPaymentLinkId) {
       return {
         settled: true,
