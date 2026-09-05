@@ -205,56 +205,62 @@ export class BatchProcessor {
       .filter((t) => t.status === "FAILED" || t.status === "ABANDONED")
       .sort((a, b) => a.transactionId.localeCompare(b.transactionId));
 
-    // Intelligently prioritize transactions that have not yet hit retry limit or already recovered
+    // ── Intelligently skip already-processed transactions ─────────────────
+    // When a batch is executed, transactions that were attempted, recovered,
+    // blocked by guardrails, marked not recoverable, or escalated are recorded.
+    // Subsequent batches skip those and move forward to the NEXT unprocessed transactions.
     let prioritizedTransactions = eligibleTransactions;
-    if (!this.dryRun) {
-      try {
-        const auditCollection = await getAuditLogCollection();
-        const logs = await auditCollection
-          .find({
-            eventType: { $in: ["ACTION_EXECUTED", "ACTION_VERIFIED"] },
-          })
-          .project({ transactionId: 1, eventType: 1, result: 1 })
-          .toArray();
+    try {
+      const processedTransactionIds = new Set<string>();
 
-        const executionCounts = new Map<string, number>();
-        const verifiedRecoveries = new Set<string>();
+      // 1. Check previous batch runs to skip transactions already evaluated in past batches
+      const batchCollection = await getBatchRunCollection();
+      const previousRuns = await batchCollection
+        .find({ batchId: { $ne: batchId } })
+        .project({ "summary.outcomes.transactionId": 1 })
+        .toArray();
 
-        for (const log of logs) {
-          if (log.eventType === "ACTION_EXECUTED") {
-            executionCounts.set(
-              log.transactionId,
-              (executionCounts.get(log.transactionId) || 0) + 1
-            );
-          }
-          if (
-            log.eventType === "ACTION_VERIFIED" &&
-            (log.result === "SUCCESS" || log.result === "VERIFIED")
-          ) {
-            verifiedRecoveries.add(log.transactionId);
+      for (const run of previousRuns) {
+        if (run.summary?.outcomes) {
+          for (const outcome of run.summary.outcomes) {
+            if (outcome.transactionId) {
+              processedTransactionIds.add(outcome.transactionId);
+            }
           }
         }
+      }
 
-        // Fresh transactions: unrecovered and retried fewer than 3 times
-        const freshTransactions = eligibleTransactions.filter(
-          (t) =>
-            !verifiedRecoveries.has(t.transactionId) &&
-            (executionCounts.get(t.transactionId) || 0) < 3
-        );
-        const exhaustedTransactions = eligibleTransactions.filter(
-          (t) =>
-            verifiedRecoveries.has(t.transactionId) ||
-            (executionCounts.get(t.transactionId) || 0) >= 3
-        );
+      // 2. Check audit logs for any attempted, blocked, or verified transactions
+      const auditCollection = await getAuditLogCollection();
+      const auditLogs = await auditCollection
+        .find({})
+        .project({ transactionId: 1 })
+        .toArray();
 
-        prioritizedTransactions = [...freshTransactions, ...exhaustedTransactions];
-      } catch (err) {
-        console.warn(
-          "Could not query audit logs for batch prioritization, using default order:",
-          err
-        );
+      for (const log of auditLogs) {
+        if (log.transactionId) {
+          processedTransactionIds.add(log.transactionId);
+        }
+      }
+
+      // 3. Filter out all already-processed transactions
+      const nextPendingTransactions = eligibleTransactions.filter(
+        (t) => !processedTransactionIds.has(t.transactionId)
+      );
+
+      // If there are unprocessed transactions remaining, pick from them.
+      // If all transactions across the dataset have been evaluated, cycle from the beginning.
+      if (nextPendingTransactions.length > 0) {
+        prioritizedTransactions = nextPendingTransactions;
+      } else {
         prioritizedTransactions = eligibleTransactions;
       }
+    } catch (err) {
+      console.warn(
+        "Could not query previous runs/audit logs for transaction progression, using default order:",
+        err
+      );
+      prioritizedTransactions = eligibleTransactions;
     }
 
     // Apply optional limit

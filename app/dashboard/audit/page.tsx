@@ -10,15 +10,15 @@ interface AuditPageProps {
 }
 
 const EVENT_TYPES: Array<{ value: string; label: string }> = [
-  { value: "ALL", label: "All Events" },
-  { value: "PAYMENT_DETECTED", label: "Payment Detected" },
-  { value: "AI_ANALYSIS", label: "AI Analysis" },
-  { value: "RECOVERY_RECOMMENDED", label: "Recovery Recommended" },
-  { value: "GUARDRAIL_CHECK", label: "Guardrail Check" },
-  { value: "ACTION_EXECUTED", label: "Action Executed" },
-  { value: "ACTION_BLOCKED", label: "Action Blocked" },
-  { value: "HUMAN_REVIEW", label: "Human Review" },
-  { value: "ACTION_VERIFIED", label: "Action Verified" },
+  { value: "ALL", label: "All" },
+  { value: "PAYMENT_DETECTED", label: "Detected" },
+  { value: "AI_ANALYSIS", label: "Analysis" },
+  { value: "RECOVERY_RECOMMENDED", label: "Recommended" },
+  { value: "GUARDRAIL_CHECK", label: "Guardrail" },
+  { value: "ACTION_EXECUTED", label: "Executed" },
+  { value: "ACTION_BLOCKED", label: "Blocked" },
+  { value: "HUMAN_REVIEW", label: "Review" },
+  { value: "ACTION_VERIFIED", label: "Verified" },
   { value: "ERROR", label: "Errors" },
 ];
 
@@ -28,6 +28,15 @@ function badgeClassForColor(color: string) {
   if (color === "amber") return "badge-amber";
   if (color === "purple") return "badge-purple";
   return "badge-blue";
+}
+
+/** Convert SCREAMING_CASE to Title Case */
+function humanize(str: string | undefined | null): string {
+  if (!str) return "—";
+  return str
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export default async function AuditLogsPage({ searchParams }: AuditPageProps) {
@@ -65,11 +74,7 @@ export default async function AuditLogsPage({ searchParams }: AuditPageProps) {
     <div>
       <div className="page-header flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="page-title">Compliance Audit Trail</h1>
-          <p className="page-subtitle">
-            Review every AI recommendation, policy verification, and recovery
-            action with a searchable, append-only operating record.
-          </p>
+          <h1 className="page-title">Audit Trail</h1>
         </div>
       </div>
 
@@ -105,8 +110,8 @@ export default async function AuditLogsPage({ searchParams }: AuditPageProps) {
                 type="text"
                 name="search"
                 defaultValue={currentSearch}
-                placeholder="Search transaction, actor, or reason"
-                className="input-text text-xs w-64"
+                placeholder="Search by transaction or actor"
+                className="input-text text-xs w-56"
               />
               <button type="submit" className="btn btn-secondary btn-sm">
                 Filter
@@ -127,8 +132,7 @@ export default async function AuditLogsPage({ searchParams }: AuditPageProps) {
               <div className="empty-state">
                 <div className="empty-state-icon">--</div>
                 <div className="empty-state-text">
-                  No audit logs found matching filter &apos;{currentEvent}&apos;
-                  {currentSearch ? ` and search '${currentSearch}'` : ""}.
+                  No audit logs found.
                 </div>
               </div>
             ) : (
@@ -136,12 +140,12 @@ export default async function AuditLogsPage({ searchParams }: AuditPageProps) {
                 <table>
                   <thead>
                     <tr>
-                      <th>Timestamp</th>
-                      <th>Event Type</th>
-                      <th>Transaction ID</th>
+                      <th>Time</th>
+                      <th>Event</th>
+                      <th>Transaction</th>
                       <th>Actor</th>
                       <th>Result</th>
-                      <th>Reason / Summary</th>
+                      <th>Details</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -149,32 +153,32 @@ export default async function AuditLogsPage({ searchParams }: AuditPageProps) {
                       const color = auditEventColor(log.eventType);
                       return (
                         <tr key={log.logId || idx}>
-                          <td className="text-xs font-mono text-slate-400">
+                          <td className="text-xs font-mono text-slate-400 whitespace-nowrap">
                             {formatDateTime(log.timestamp)}
                           </td>
                           <td>
                             <span className={`badge ${badgeClassForColor(color)}`}>
-                              {log.eventType}
+                              {humanize(log.eventType)}
                             </span>
                           </td>
                           <td>
                             <Link
                               href={`/dashboard/transactions/${log.transactionId}`}
-                              className="text-mono font-semibold text-sky-400 hover:underline"
+                              className="text-mono font-medium text-sky-400 hover:underline"
                             >
                               {log.transactionId}
                             </Link>
                           </td>
-                          <td className="text-xs font-mono text-slate-300">
+                          <td className="text-xs text-slate-400">
                             {log.actor}
                           </td>
                           <td>
-                            <span className="text-xs font-semibold font-mono text-slate-100">
-                              {log.result}
+                            <span className="text-xs font-medium">
+                              {humanize(log.result)}
                             </span>
                           </td>
-                          <td className="text-xs text-slate-300 max-w-md truncate">
-                            {log.reason || "None"}
+                          <td className="text-xs text-slate-400 max-w-xs truncate">
+                            {log.reason || "—"}
                           </td>
                         </tr>
                       );

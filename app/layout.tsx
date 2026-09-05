@@ -14,11 +14,19 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "RecoverAI - Revenue Recovery Agent",
-    template: "%s | RecoverAI",
+    default: "Recovery AI - Revenue Recovery Agent",
+    template: "%s | Recovery AI",
   },
   description:
     "AI-powered merchant revenue recovery dashboard for the Razorpay AI Buildathon",
+  icons: {
+    icon: [
+      { url: "/logo.png", type: "image/png" },
+      { url: "/favicon.ico" },
+    ],
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

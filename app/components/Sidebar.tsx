@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -29,11 +30,17 @@ export function Sidebar() {
       <div className="sidebar-logo">
         <Link href="/dashboard" className="sidebar-logo-mark">
           <span className="brand-icon" aria-hidden="true">
-            <SparkIcon />
+            <Image
+              src="/logo.png"
+              alt="Recovery AI"
+              width={28}
+              height={28}
+              className="brand-logo-img"
+              priority
+            />
           </span>
-          RecoverAI
+          Recovery AI
         </Link>
-        <div className="sidebar-logo-sub">Revenue recovery operations</div>
       </div>
 
       <nav className="sidebar-nav">
@@ -64,27 +71,7 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="sidebar-status flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <span className="font-medium">Gateway</span>
-          <span className="badge badge-amber font-mono">TEST MODE</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="pulse-dot" />
-          <span className="text-[11px] text-emerald-400 font-semibold">
-            AI Agent Ready
-          </span>
-        </div>
-      </div>
     </aside>
-  );
-}
-
-function SparkIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor">
-      <path d="M10.8 1.5a.75.75 0 0 0-1.4 0L8.1 5.2a3.3 3.3 0 0 1-2 2L2.4 8.6a.75.75 0 0 0 0 1.4l3.7 1.3a3.3 3.3 0 0 1 2 2l1.3 3.7a.75.75 0 0 0 1.4 0l1.3-3.7a3.3 3.3 0 0 1 2-2l3.7-1.3a.75.75 0 0 0 0-1.4l-3.7-1.3a3.3 3.3 0 0 1-2-2L10.8 1.5Z" />
-    </svg>
   );
 }
 

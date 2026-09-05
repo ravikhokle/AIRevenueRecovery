@@ -1,6 +1,3 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
 import {
   formatRupeesLong,
@@ -8,6 +5,7 @@ import {
   classificationBadge,
 } from "@/app/components/utils";
 import type { EnrichedTransaction } from "@/lib/dashboard/data";
+
 
 interface TransactionsTableProps {
   transactions: EnrichedTransaction[];
@@ -18,15 +16,6 @@ export function TransactionsTable({
   transactions,
   emptyMessage = "No transactions found",
 }: TransactionsTableProps) {
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  const handleCopy = (id: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    navigator.clipboard?.writeText(id);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 1800);
-  };
 
   if (transactions.length === 0) {
     return (
@@ -90,26 +79,17 @@ export function TransactionsTable({
             }
 
             return (
-              <tr key={tx.transactionId} className="group">
+              <tr key={tx.transactionId}>
                 <td>
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/dashboard/transactions/${tx.transactionId}`}
-                      className="text-mono font-semibold text-sky-400 hover:underline"
-                    >
-                      {tx.transactionId}
-                    </Link>
-                    <button
-                      onClick={(e) => handleCopy(tx.transactionId, e)}
-                      title="Copy transaction ID"
-                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-sky-400 transition-opacity p-1 text-xs"
-                    >
-                      {copiedId === tx.transactionId ? "Copied" : "Copy"}
-                    </button>
-                  </div>
+                  <Link
+                    href={`/dashboard/transactions/${tx.transactionId}`}
+                    className="text-mono font-medium text-sky-400 hover:underline"
+                  >
+                    {tx.transactionId}
+                  </Link>
                 </td>
                 <td>
-                  <span className="font-semibold text-slate-100 font-mono">
+                  <span className="font-medium">
                     {formatRupeesLong(tx.amount)}
                   </span>
                 </td>
@@ -125,20 +105,20 @@ export function TransactionsTable({
                 </td>
                 <td>
                   {tx.recommendedAction ? (
-                    <span className="text-xs font-mono px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-slate-300">
+                    <span className="text-xs text-slate-400 font-mono">
                       {tx.recommendedAction}
                     </span>
                   ) : (
-                    <span className="text-slate-500 text-xs">None</span>
+                    <span className="text-slate-500 text-xs">—</span>
                   )}
                 </td>
                 <td>
                   {tx.confidence !== undefined ? (
-                    <span className="text-xs font-mono font-bold text-slate-200">
+                    <span className="text-xs font-medium">
                       {(tx.confidence * 100).toFixed(0)}%
                     </span>
                   ) : (
-                    <span className="text-slate-500 text-xs">None</span>
+                    <span className="text-slate-500 text-xs">—</span>
                   )}
                 </td>
                 <td>{guardrailBadge}</td>

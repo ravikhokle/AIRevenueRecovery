@@ -9,6 +9,7 @@ import {
   getTransactionsCollection,
 } from "@/lib/models/transaction";
 import { getAuditLogCollection } from "@/lib/models/audit-log";
+import { getBatchRunCollection } from "@/lib/models/batch-run";
 import { generateSyntheticDataset } from "@/lib/seed/generator";
 
 export async function POST() {
@@ -22,8 +23,9 @@ export async function POST() {
     const transactions = await getTransactionsCollection();
     const customers = await getCustomersCollection();
     const auditLogs = await getAuditLogCollection();
+    const batchRuns = await getBatchRunCollection();
 
-    // Delete existing synthetic data
+    // Delete existing synthetic data and previous runs
     await transactions.deleteMany({
       transactionId: { $regex: "^syn_" },
     });
@@ -33,6 +35,7 @@ export async function POST() {
     await auditLogs.deleteMany({
       transactionId: { $regex: "^syn_" },
     });
+    await batchRuns.deleteMany({});
 
     // Re-insert fresh baseline
     await transactions.insertMany(dataset.transactions as any[]);

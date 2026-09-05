@@ -40,10 +40,7 @@ export default async function TransactionsListPage({
       <div className="page-header flex items-center justify-between">
         <div>
           <h1 className="page-title">Payment Transactions</h1>
-          <p className="page-subtitle">
-            Search and review payment records with AI recovery classifications,
-            confidence scores, guardrail decisions, and verified execution results.
-          </p>
+
         </div>
       </div>
 

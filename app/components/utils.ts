@@ -41,6 +41,7 @@ export function formatDate(iso: string | Date): string {
     day: "2-digit",
     month: "short",
     year: "numeric",
+    timeZone: "Asia/Kolkata",
   });
 }
 
@@ -54,6 +55,7 @@ export function formatDateTime(iso: string | Date): string {
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
+    timeZone: "Asia/Kolkata",
   });
 }
 

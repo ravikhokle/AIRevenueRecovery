@@ -124,21 +124,21 @@ export function RunWorkflowButton({
       </div>
 
       {showReviewModal && (
-        <div className="panel-soft mt-2 w-80 p-3 shadow-lg flex flex-col gap-2.5 z-10">
-          <div className="text-xs font-bold text-slate-100">
+        <div className="card mt-2 w-80 p-4 shadow-xl border border-slate-200 bg-white flex flex-col gap-3 z-20">
+          <div className="text-xs font-bold text-slate-900">
             Operator Review & Execution
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             Authorize or reject the recovery action with operator attribution.
           </p>
           <input
             type="text"
-            placeholder="Optional review notes"
+            placeholder="Optional review notes..."
             value={operatorNotes}
             onChange={(e) => setOperatorNotes(e.target.value)}
             className="input-text w-full text-xs"
           />
-          <div className="flex gap-2 justify-end">
+          <div className="flex gap-2 justify-end pt-1">
             <button
               onClick={() => handleHumanReview("REJECT")}
               disabled={loading}
@@ -159,13 +159,14 @@ export function RunWorkflowButton({
 
       {message && (
         <div
-          className={`text-xs px-3 py-2 rounded-md border ${
+          className={`text-xs px-3 py-2 rounded-lg border flex items-center gap-1.5 ${
             message.type === "success"
-              ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/40"
-              : "bg-rose-950/40 text-rose-300 border-rose-800/60"
+              ? "bg-emerald-50 text-emerald-800 border-emerald-200 font-medium"
+              : "bg-rose-50 text-rose-800 border-rose-200 font-medium"
           }`}
         >
-          {message.text}
+          <span>{message.type === "success" ? "✓" : "⚠"}</span>
+          <span>{message.text}</span>
         </div>
       )}
     </div>
