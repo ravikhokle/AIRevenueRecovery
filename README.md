@@ -199,8 +199,8 @@ Open `http://localhost:3000`.
 
 ## 🎥 Pitch Video & Demo
 
-* **Repository:** [GitHub Repository](https://github.com/ravikhokle/AIRevenueRecovery)
-* **Pitch Video:***https://github.com/ravikhokle/AIRevenueRecovery*
+* **Repository: https://github.com/ravikhokle/AIRevenueRecovery
+* **Pitch Video: https://youtu.be/Ilr5OEmsvDU
 
 ---
 
